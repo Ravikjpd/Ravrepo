@@ -1,25 +1,32 @@
 name: Test Trivy Scan
+
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:  # 👈 This allows manual triggering from any branch via GitHub UI
+
 permissions:
   security-events: write
+
 jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
         with:
-          image-ref: 'python:3.6-slim-buster' # Known vulnerable image
+          image-ref: 'python:3.6-slim-buster'  # Known vulnerable image
           format: 'template'
           template: '@/contrib/sarif.tpl'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
+
       - name: Debug SARIF file
         run: cat trivy-results.sarif
+
       - name: Upload SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
