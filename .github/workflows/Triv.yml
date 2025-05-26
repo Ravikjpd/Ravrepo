@@ -32,6 +32,11 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
+      - name: Move report to reports directory
+        run: |
+          mkdir -p security-reports
+          mv trivy-report.json security-reports/trivy-report.json
+
       - name: Commit and push Trivy report
         run: |
           git config user.name "github-actions[bot]"
