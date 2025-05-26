@@ -31,3 +31,11 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+
+      - name: Commit and push Trivy report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add security-reports/trivy-report.json
+          git commit -m "Add Trivy vulnerability report"
+          git push
