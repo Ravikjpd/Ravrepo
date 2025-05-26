@@ -1,0 +1,35 @@
+name: Trivy Image Scan and Save Report
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  image-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy on Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'python:3.6-slim-buster'
+          format: json
+          output: trivy-report.json
+          severity: CRITICAL,HIGH
+
+      - name: Save report to repo
+        run: |
+          mkdir -p security-reports
+          mv trivy-report.json security-reports/trivy-report.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add security-reports/trivy-report.json
+          git commit -m "Add Trivy image scan report" || echo "No changes to commit"
+          git push
