@@ -50,7 +50,7 @@ jobs:
     - name: Upload SARIF report to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@v3
       with:
-        sarif_file: security-reports/trivy-report-${REPORT_SHA}.sarif
+        sarif_file: security-reports/trivy-report-${{ env.REPORT_SHA }}.sarif
 
     - name: Create GitHub issue if vulnerabilities found
       if: success()
