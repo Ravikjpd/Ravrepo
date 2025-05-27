@@ -8,7 +8,8 @@ on:
 permissions:
   contents: write  # 👈 Required to allow pushing commits
   actions: read
-
+  security-events: write
+  
 jobs:
   trivy-nginx-scan:
     name: Scan nginx:1.21 with Trivy
