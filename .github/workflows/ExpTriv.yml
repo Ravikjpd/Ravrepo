@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write  # 👈 Required to allow pushing commits
+  actions: read
 
 jobs:
   trivy-nginx-scan:
