@@ -6,10 +6,11 @@ on:
     branches: [main]
 
 permissions:
-  contents: write  # 👈 Required to allow pushing commits
+  contents: write      # For pushing commits
   actions: read
-  security-events: write
-  
+  security-events: write  # For uploading SARIF reports
+  issues: write        # For creating GitHub issues
+
 jobs:
   trivy-nginx-scan:
     name: Scan nginx:1.21 with Trivy
@@ -26,24 +27,49 @@ jobs:
     - name: Create reports directory
       run: mkdir -p security-reports
 
+    - name: Set dynamic filename
+      run: echo "REPORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
     - name: Run Trivy scan on nginx:1.21 (JSON + SARIF)
       run: |
-        trivy image nginx:1.21 --format json --output security-reports/trivy-report.json
-        trivy image nginx:1.21 --format sarif --output security-reports/trivy-report.sarif
+        trivy image nginx:1.21 --format json --output security-reports/trivy-report-${REPORT_SHA}.json
+        trivy image nginx:1.21 --format sarif --output security-reports/trivy-report-${REPORT_SHA}.sarif
 
     - name: Commit Trivy reports to repo
       run: |
-        if [ -f security-reports/trivy-report.json ]; then
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions@github.com"
-          git add security-reports/trivy-report.*
-          git commit -m "Add Trivy scan report for nginx:1.21"
-          git push
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions@github.com"
+        git add security-reports/trivy-report-${REPORT_SHA}.*
+        if git diff --cached --quiet; then
+          echo "No changes to commit."
         else
-          echo "Trivy reports not found. Skipping commit."
+          git commit -m "Add Trivy scan report for nginx:1.21 - commit ${REPORT_SHA}"
+          git push
         fi
 
     - name: Upload SARIF report to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@v3
       with:
-        sarif_file: security-reports/trivy-report.sarif
+        sarif_file: security-reports/trivy-report-${REPORT_SHA}.sarif
+
+    - name: Create GitHub issue if vulnerabilities found
+      if: success()
+      env:
+        REPORT_JSON: security-reports/trivy-report-${{ env.REPORT_SHA }}.json
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Check if vulnerabilities exist in JSON report
+        VULN_COUNT=$(jq '[.Results[].Vulnerabilities[]?] | length' "$REPORT_JSON")
+        if [ "$VULN_COUNT" -gt 0 ]; then
+          # Extract a summary of vulnerabilities (IDs and severity)
+          SUMMARY=$(jq -r '[.Results[].Vulnerabilities[]? | "\(.VulnerabilityID) (\(.Severity))"] | unique | .[]' "$REPORT_JSON" | head -20)
+          
+          TITLE="Trivy Vulnerability Report - nginx:1.21 @ ${REPORT_SHA}"
+          BODY="A Trivy scan of the Docker image **nginx:1.21** found *${VULN_COUNT}* vulnerabilities.\n\n**Top vulnerabilities:**\n\`\`\`\n${SUMMARY}\n\`\`\`\n\nPlease review and remediate as necessary."
+          
+          # Create GitHub issue using gh CLI
+          gh issue create --title "$TITLE" --body "$BODY" --label "security,trivy" --assignee "@me"
+          echo "GitHub issue created."
+        else
+          echo "No vulnerabilities found; skipping issue creation."
+        fi
