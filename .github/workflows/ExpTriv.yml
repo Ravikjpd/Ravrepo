@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write  # 👈 Required to allow pushing commits
+
 jobs:
   trivy-nginx-scan:
     name: Scan nginx:1.21 with Trivy
@@ -14,7 +17,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Trivyy
+    - name: Install Trivy
       run: |
         curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
@@ -38,7 +41,7 @@ jobs:
           echo "Trivy reports not found. Skipping commit."
         fi
 
-    - name: Upload SARIF report to GitHub Code Scanningg
+    - name: Upload SARIF report to GitHub Code Scanning
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: security-reports/trivy-report.sarif
