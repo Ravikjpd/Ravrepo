@@ -38,7 +38,7 @@ jobs:
           echo "Trivy reports not found. Skipping commit."
         fi
 
-    - name: Upload SARIF report to GitHub Code Scanning
+    - name: Upload SARIF report to GitHub Code Scanningg
       uses: github/codeql-action/upload-sarif@v2
       with:
         sarif_file: security-reports/trivy-report.sarif
