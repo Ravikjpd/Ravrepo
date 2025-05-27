@@ -52,22 +52,27 @@ jobs:
       with:
         sarif_file: security-reports/trivy-report-${{ env.REPORT_SHA }}.sarif
 
+    - name: Ensure labels exist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh label create security --color FF0000 --description "Security issues" || echo "Label 'security' exists"
+        gh label create trivy --color 00FF00 --description "Trivy scan issues" || echo "Label 'trivy' exists"
+
     - name: Create GitHub issue if vulnerabilities found
       if: success()
       env:
         REPORT_JSON: security-reports/trivy-report-${{ env.REPORT_SHA }}.json
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPORT_SHA: ${{ env.REPORT_SHA }}
       run: |
-        # Check if vulnerabilities exist in JSON report
         VULN_COUNT=$(jq '[.Results[].Vulnerabilities[]?] | length' "$REPORT_JSON")
         if [ "$VULN_COUNT" -gt 0 ]; then
-          # Extract a summary of vulnerabilities (IDs and severity)
-          SUMMARY=$(jq -r '[.Results[].Vulnerabilities[]? | "\(.VulnerabilityID) (\(.Severity))"] | unique | .[]' "$REPORT_JSON" | head -20)
+          SUMMARY=$(jq -r '[.Results[].Vulnerabilities[]? | "\(.VulnerabilityID) (\(.Severity))"] | unique | .[]' "$REPORT_JSON" | head -20 || true)
           
           TITLE="Trivy Vulnerability Report - nginx:1.21 @ ${REPORT_SHA}"
           BODY="A Trivy scan of the Docker image **nginx:1.21** found *${VULN_COUNT}* vulnerabilities.\n\n**Top vulnerabilities:**\n\`\`\`\n${SUMMARY}\n\`\`\`\n\nPlease review and remediate as necessary."
           
-          # Create GitHub issue using gh CLI
           gh issue create --title "$TITLE" --body "$BODY" --label "security,trivy"
           echo "GitHub issue created."
         else
