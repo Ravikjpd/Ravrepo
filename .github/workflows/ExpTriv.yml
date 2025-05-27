@@ -1,35 +1,44 @@
-name: Trivy Image Scan and Save Report
+name: Trivy Scan - nginx:1.21
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
-
-permissions:
-  contents: write
+  push:
+    branches: [main]
 
 jobs:
-  image-scan:
+  trivy-nginx-scan:
+    name: Scan nginx:1.21 with Trivy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Run Trivy on Docker image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'python:3.6-slim-buster'
-          format: json
-          output: trivy-report.json
-          severity: CRITICAL,HIGH
+    - name: Install Trivyy
+      run: |
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Save report to repo
-        run: |
-          mkdir -p security-reports
-          mv trivy-report.json security-reports/trivy-report.json
+    - name: Create reports directory
+      run: mkdir -p security-reports
+
+    - name: Run Trivy scan on nginx:1.21 (JSON + SARIF)
+      run: |
+        trivy image nginx:1.21 --format json --output security-reports/trivy-report.json
+        trivy image nginx:1.21 --format sarif --output security-reports/trivy-report.sarif
+
+    - name: Commit Trivy reports to repo
+      run: |
+        if [ -f security-reports/trivy-report.json ]; then
           git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add security-reports/trivy-report.json
-          git commit -m "Add Trivy image scan report" || echo "No changes to commit"
+          git config user.email "github-actions@github.com"
+          git add security-reports/trivy-report.*
+          git commit -m "Add Trivy scan report for nginx:1.21"
           git push
+        else
+          echo "Trivy reports not found. Skipping commit."
+        fi
+
+    - name: Upload SARIF report to GitHub Code Scanning
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: security-reports/trivy-report.sarif
