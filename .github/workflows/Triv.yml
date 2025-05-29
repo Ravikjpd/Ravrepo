@@ -2,7 +2,7 @@ name: Test Trivy Scan
 
 on:
   push:
-    branches: [ main ]
+    #branches: [ main ]
   workflow_dispatch:  # 👈 This allows manual triggering from any branch via GitHub UI
 
 permissions:
