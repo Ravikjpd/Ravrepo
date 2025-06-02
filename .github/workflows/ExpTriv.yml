@@ -59,7 +59,7 @@ jobs:
         gh label create security --color FF0000 --description "Security issues" || echo "Label 'security' exists"
         gh label create trivy --color 00FF00 --description "Trivy scan issues" || echo "Label 'trivy' exists"
 
-    - name: Create GitHub issue if vulnerabilities found
+    - name: Create GitHub issue if vulnerabilities Foundd
       if: success()
       env:
         REPORT_JSON: security-reports/trivy-report-${{ env.REPORT_SHA }}.json
