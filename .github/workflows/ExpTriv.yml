@@ -59,26 +59,22 @@ jobs:
         gh label create security --color FF0000 --description "Security issues" || echo "Label 'security' exists"
         gh label create trivy --color 00FF00 --description "Trivy scan issues" || echo "Label 'trivy' exists"
 
-   
-    - name: Parse Trivy results and create GitHub Issues
+    - name: Create GitHub issue if vulnerabilities Foundd
+      if: success()
       env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPORT_JSON: security-reports/trivy-report-${{ env.REPORT_SHA }}.json
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPORT_SHA: ${{ env.REPORT_SHA }}
       run: |
-          # Check if trivy-report-${REPORT_SHA}.json exists and has vulnerabilities
-          if [ ! -f trivy-report-${REPORT_SHA}.json ] || [ "$(jq '.Results | length' trivy-report-${REPORT_SHA}.json)" -eq 0 ]; then
-            echo "No vulnerabilities found or scan failed."
-            exit 0
-          fi
-
-          # Parse each vulnerability and create an issue
-          jq -r '.Results[].Vulnerabilities[] | select(.Severity == "HIGH" or .Severity == "CRITICAL") | 
-            "Title: \(.VulnerabilityID) (\(.Severity))\n\n" +
-            "Description: \(.Description)\n" +
-            "Package: \(.PkgName)\n" +
-            "Installed Version: \(.InstalledVersion)\n" +
-            "Fixed Version: \(.FixedVersion // \"None\"))\n" +
-            "References: \(.References | join(\"\n\"))"' trivy-results.json | while IFS= read -r issue; do
-            title=$(echo "$issue" | grep "Title:" | cut -d ':' -f2- | xargs)
-            body=$(echo "$issue" | grep -v "Title:" | xargs -0)
-            gh issue create --title "$title" --body "$body" --label "vulnerability"
-          done
+        VULN_COUNT=$(jq '[.Results[].Vulnerabilities[]?] | length' "$REPORT_JSON")
+        if [ "$VULN_COUNT" -gt 0 ]; then
+          SUMMARY=$(jq -r '[.Results[].Vulnerabilities[]? | "\(.VulnerabilityID) (\(.Severity))"] | unique | .[]' "$REPORT_JSON" | head -20 || true)
+          
+          TITLE="Trivy Vulnerability Report - nginx:1.21 @ ${REPORT_SHA}"
+          BODY="A Trivy scan of the Docker image **nginx:1.21** found *${VULN_COUNT}* vulnerabilities.\n\n**Top vulnerabilities:**\n\`\`\`\n${SUMMARY}\n\`\`\`\n\nPlease review and remediate as necessary."
+          
+          gh issue create --title "$TITLE" --body "$BODY" --label "security,trivy"
+          echo "GitHub issue created."
+        else
+          echo "No vulnerabilities found; skipping issue creation."
+        fi
